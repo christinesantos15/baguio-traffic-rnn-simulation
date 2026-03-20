@@ -9,28 +9,43 @@ from congestion import compute_congestion
 app = Flask(__name__)
 CORS(app)
 
-# --- HELPER LOGIC FOR DIVERSIONS ---
-def generate_recommendation(selected_direction, predicted_speed):
-    # Mapping the EXACT strings from your dropdown to Baguio diversion routes
+def generate_recommendation(selected_direction, predicted_speed, congestion_index):
+    """
+    Generate route recommendation based on traffic conditions
+    """
     diversion_map = {
-        "North (City Center)": "Legarda Road or Magsaysay Avenue",
-        "South (Residential)": "Military Cut-off Road or Loakan Road",
-        "East (Commercial)": "South Drive or Outlook Drive",
-        "West (Suburban)": "Naguilian Road or Bokawkan Road"
+        "North (City Center)": {
+            "primary": "Harrison Road",
+            "alternative": "Legarda Road or Magsaysay Avenue",
+            "description": "City center route via Session Road"
+        },
+        "South (Residential)": {
+            "primary": "Gov. Pack Road",
+            "alternative": "Military Cut-off Road or Loakan Road",
+            "description": "Residential area connection"
+        },
+        "East (Airport/Ind.)": {
+            "primary": "Session Road",
+            "alternative": "South Drive or Outlook Drive",
+            "description": "Airport and industrial access"
+        },
+        "West (Business Dist.)": {
+            "primary": "Kisad Road",
+            "alternative": "Naguilian Road or Bokawkan Road",
+            "description": "Business district corridor"
+        }
     }
 
-    # Threshold: 18.0 km/h (Matches your 14.85 km/h scenario)
-    if predicted_speed < 18.0:
-        # Get the specific diversion based on the direction label
-        route_alt = diversion_map.get(selected_direction)
-        
-        if route_alt:
-            return f"⚠️ PEAK HOUR WARNING: Speed dropped to {predicted_speed}km/h. Divert via {route_alt}."
-        else:
-            # This handles cases where the string might have extra spaces or slight variations
-            return f"⚠️ PEAK HOUR WARNING: Speed dropped to {predicted_speed}km/h. Divert via the nearest secondary artery."
+    route_info = diversion_map.get(selected_direction, diversion_map["North (City Center)"])
+    
+    if congestion_index >= 15:
+        return f"⚠️ SEVERE CONGESTION: Speed at {predicted_speed}km/h on {route_info['primary']}. STRONGLY RECOMMEND diverting via {route_info['alternative']}."
+    elif congestion_index >= 10:
+        return f"⚠️ HEAVY TRAFFIC: {predicted_speed}km/h on {route_info['primary']}. Consider using {route_info['alternative']}."
+    elif congestion_index >= 5:
+        return f"⚠️ MODERATE TRAFFIC: {predicted_speed}km/h on {route_info['primary']}. Monitor conditions."
     else:
-        return f"✅ CLEAR ROUTE. The standard {selected_direction} path is optimal."
+        return f"✅ CLEAR ROUTE: {predicted_speed}km/h on {route_info['primary']}. Optimal path for {selected_direction}."
 
 @app.route("/run-simulation", methods=["POST"])
 def run_simulation():
@@ -40,48 +55,70 @@ def run_simulation():
         df = load_and_filter_data(scenario)
 
         if df.empty:
-            return jsonify({"error": "No data found for this selection."}), 404
+            return jsonify({"error": "No data found for this selection. Try different parameters."}), 404
 
         # 2. Process AI Models
         X, y = build_sequences(df)
         model_data = run_rnn_models(X, y)
         
+        if not model_data:
+            return jsonify({"error": "Insufficient data for model processing. Need at least 15 data points."}), 400
+
         # 3. Prepare Chart Visuals
         recent_df = df.tail(20)
         chart_data = {
             "labels": recent_df["timestamp"].dt.strftime('%H:%M').tolist(),
-            "actual": recent_df["speed_kmh"].tolist()
+            "actual": [round(speed, 1) for speed in recent_df["speed_kmh"].tolist()]
         }
 
-        # 4. Extract Simple RNN performance
+        # 4. Calculate congestion index
         simple_rnn_speed = model_data["Simple RNN"]["predicted_speed"]
-        cong_idx = compute_congestion(len(df), [simple_rnn_speed])
+        congestion_index = compute_congestion(len(df), [simple_rnn_speed])
         
-        for model in model_data:
-            model_data[model]["compute_index"] = cong_idx
+        # 5. Generate Route Recommendation
+        direction = scenario.get("direction", "North (City Center)")
+        route_recommendation = generate_recommendation(direction, simple_rnn_speed, congestion_index)
 
-        # 5. Generate Specific Route Recommendation
-        # We get the direction from the dropdown; default to North if not found
-        direction = scenario.get("direction", "North: Harrison Road / UC Main")
-        route_recommendation = generate_recommendation(direction, simple_rnn_speed)
-
-        # 6. Determine Conclusion
+        # 6. Determine Conclusion with RNN justification
+        # Find model with lowest RMSE
         best_model = min(model_data, key=lambda x: model_data[x]['rmse'])
-        conclusion_text = f"The {best_model} is the most optimal model with an RMSE of {model_data[best_model]['rmse']}."
+        best_rmse = model_data[best_model]['rmse']
+        simple_rnn_rmse = model_data["Simple RNN"]['rmse']
+        
+        # Calculate improvement percentage
+        improvement = ((best_rmse - simple_rnn_rmse) / best_rmse) * 100 if best_rmse < simple_rnn_rmse else 0
+        
+        # Generate conclusion with RNN justification
+        if best_model == "Simple RNN":
+            conclusion_text = (
+                f"Simple RNN demonstrates optimal performance with RMSE of {best_rmse:.3f}, "
+                f"validating its effectiveness for Baguio City traffic prediction. "
+                f"The model effectively captures sequential patterns in the unique topographic "
+                f"conditions of Baguio's road network."
+            )
+        else:
+            conclusion_text = (
+                f"The {best_model} model shows best accuracy with RMSE of {best_rmse:.3f} "
+                f"({abs(improvement):.1f}% {'better' if improvement > 0 else 'different'} than Simple RNN's {simple_rnn_rmse:.3f}). "
+                f"However, Simple RNN remains competitive and computationally efficient for "
+                f"real-time traffic prediction in Baguio City."
+            )
 
-        # 7. Send JSON Response back to Dashboard
+        # 7. Send JSON Response
         return jsonify({
-            "results": model_data, 
-            "vehicle_volume": len(df), 
+            "results": model_data,
+            "vehicle_volume": len(df),
             "chart_data": chart_data,
             "conclusion": conclusion_text,
-            "recommended_route": route_recommendation
+            "recommended_route": route_recommendation,
+            "congestion_index": congestion_index
         })
 
     except Exception as e:
         traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": f"Server error: {str(e)}"}), 500
 
 if __name__ == "__main__":
-    # Ensure port 5000 is open on your local machine
+    print("🚦 Baguio Traffic RNN Simulator Starting...")
+    print("📍 Server running on http://127.0.0.1:5000")
     app.run(debug=True, port=5000)
