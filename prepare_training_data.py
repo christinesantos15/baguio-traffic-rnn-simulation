@@ -11,8 +11,8 @@ if 'speed_kmh' not in df_original.columns:
     # Example: if your original column is just 'speed', rename it
     df_original = df_original.rename(columns={'speed': 'speed_kmh'})
 
-# 2. Define target total rows for training (e.g., 10,000)
-total_rows = 10000
+# 2. Define target total rows for training (e.g., 104,406)
+total_rows = 104406
 n_sim = int(total_rows * 0.70)
 n_orig = int(total_rows * 0.30)
 
