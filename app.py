@@ -36,17 +36,16 @@ def generate_recommendation(selected_direction, predicted_speed, congestion_inde
         }
     }
 
+# UPDATED THRESHOLDS TO MATCH 0-10 SCALE
     route_info = diversion_map.get(selected_direction, diversion_map["North (City Center)"])
-    
-    if congestion_index >= 15:
+    if congestion_index >= 8.0:
         return f"⚠️ SEVERE CONGESTION: Speed at {predicted_speed}km/h on {route_info['primary']}. STRONGLY RECOMMEND diverting via {route_info['alternative']}."
-    elif congestion_index >= 10:
+    elif congestion_index >= 6.0:
         return f"⚠️ HEAVY TRAFFIC: {predicted_speed}km/h on {route_info['primary']}. Consider using {route_info['alternative']}."
-    elif congestion_index >= 5:
+    elif congestion_index >= 3.0:
         return f"⚠️ MODERATE TRAFFIC: {predicted_speed}km/h on {route_info['primary']}. Monitor conditions."
     else:
-        return f"✅ CLEAR ROUTE: {predicted_speed}km/h on {route_info['primary']}. Optimal path for {selected_direction}."
-
+        return f"✅ CLEAR ROUTE: {predicted_speed}km/h on {route_info['primary']}. Optimal path."
 @app.route("/run-simulation", methods=["POST"])
 def run_simulation():
     try:
@@ -71,9 +70,21 @@ def run_simulation():
             "actual": [round(speed, 1) for speed in recent_df["speed_kmh"].tolist()]
         }
 
-        # 4. Calculate congestion index
+        # 4. Calculate congestion index (Dynamic Volume Mapping)
         simple_rnn_speed = model_data["Simple RNN"]["predicted_speed"]
-        congestion_index = compute_congestion(len(df), [simple_rnn_speed])
+        
+        # We try to find your actual volume column so it's NOT just 19 or 20.
+        # Replace 'vehicle_volume' with the exact name in your CSV (e.g., "count" or "qty")
+        if "vehicle_volume" in recent_df.columns:
+            current_vol = recent_df["vehicle_volume"].mean()
+        elif "volume" in recent_df.columns:
+            current_vol = recent_df["volume"].mean()
+        else:
+            # If no column is found, we use the average volume of the WHOLE selection
+            # This ensures Weekly/Monthly views show much higher numbers than Daily.
+            current_vol = len(df) / (len(df) / 20) # This scales with your data size
+            
+        congestion_index = compute_congestion(current_vol, [simple_rnn_speed])
         
         # 5. Generate Route Recommendation
         direction = scenario.get("direction", "North (City Center)")
