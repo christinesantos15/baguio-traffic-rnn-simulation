@@ -279,16 +279,16 @@
             <canvas id="lineChart"></canvas>
         </div>
 
-        <div class="comparison-container">
-            <div class="chart-box">
-                <div class="chart-title">📊 Model Speed Comparison</div>
-                <canvas id="speedChart"></canvas>
-            </div>
-            <div class="chart-box">
-                <div class="chart-title">📊 Model Accuracy (RMSE)</div>
-                <canvas id="accuracyChart"></canvas>
-            </div>
-        </div>
+<div class="comparison-container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-bottom: 25px;">
+    <div class="chart-box">
+        <div class="chart-title">📊 Predicted Speed Comparison (km/h)</div>
+        <canvas id="speedChart"></canvas>
+    </div>
+    <div class="chart-box">
+        <div class="chart-title">📊 Model Error Comparison (MAE vs MSE vs RMSE)</div>
+        <canvas id="metricsChart"></canvas>
+    </div>
+</div>
 
         <div class="metrics-container" id="model-metrics">
             <!-- Metrics will be populated dynamically -->
