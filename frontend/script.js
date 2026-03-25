@@ -31,7 +31,7 @@ function runSimulation() {
 function updateMetrics(results) {
     const metricsDiv = document.getElementById('model-metrics');
     let html = '';
-    const colors = { 'Simple RNN': '#3498db', 'LSTM': '#2ecc71', 'GRU': '#e74c3c' };
+    const colors = { 'GRU': '#3498db', 'LSTM': '#2ecc71', 'Simple RNN': '#e74c3c' };
     
     for (let model in results) {
         const res = results[model];
