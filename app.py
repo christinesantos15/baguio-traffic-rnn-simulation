@@ -15,24 +15,24 @@ def generate_recommendation(selected_direction, predicted_speed, congestion_inde
     """
     diversion_map = {
         "North (City Center)": {
-            "primary": "Harrison Road",
-            "alternative": "Legarda Road or Magsaysay Avenue",
+            "primary": "Gov Pack Going Session",
+            "alternative": "Harrison or F. Calderon St.",
             "description": "City center route via Session Road"
         },
         "South (Residential)": {
-            "primary": "Gov. Pack Road",
+            "primary": "Gov. Pack Going Convention",
             "alternative": "Military Cut-off Road or Loakan Road",
             "description": "Residential area connection"
         },
-        "East (Airport/Ind.)": {
-            "primary": "Session Road",
-            "alternative": "South Drive or Outlook Drive",
-            "description": "Airport and industrial access"
+        "East (Business Dist.)": {
+            "primary": "Harrison Road",
+            "alternative": "Leonard Wood or Outlook Drive",
+            "description": "Business District Corridor"
         },
-        "West (Business Dist.)": {
+        "West (Leisure Dist.)": {
             "primary": "Kisad Road",
-            "alternative": "Naguilian Road or Bokawkan Road",
-            "description": "Business district corridor"
+            "alternative": "Governor Center Road or Military Cut-Off Road",
+            "description": "Leisure district corridor"
         }
     }
 

@@ -13,8 +13,8 @@ def load_and_filter_data(scenario):
     dir_map = {
         "North (City Center)": "N",
         "South (Residential)": "S",
-        "East (Airport/Ind.)": "E",
-        "West (Business Dist.)": "W"
+        "East (Business Dist.)": "E",
+        "West (Leisure Dist.)": "W"
     }
     df = df[df["direction"] == dir_map.get(scenario["direction"])]
     
